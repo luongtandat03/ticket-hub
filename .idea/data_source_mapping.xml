@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/environment/mysql/init/ticket_init.sql" value="7ce15675-80cd-40d5-bbe0-30156c678c8a" />
+  </component>
+</project>

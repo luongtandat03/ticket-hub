@@ -1,0 +1,11 @@
+2026/08/22 09:42:20 [emerg] 18592#21152: CreateDirectory() "D:\Project\ticket-hub-backend\environment\nginx/temp/client_body_temp" failed (3: The system cannot find the path specified)
+2026/08/22 09:51:07 [notice] 10008#2160: signal process started
+2026/08/22 09:51:07 [error] 10008#2160: invalid PID number "" in "D:\Project\ticket-hub-backend\environment\nginx/logs/nginx.pid"
+2026/08/22 09:52:20 [notice] 9240#21740: signal process started
+2026/08/22 09:52:20 [error] 9240#21740: CreateFile() "D:\Project\ticket-hub-backend\environment\nginx/logs/nginx.pid" failed (2: The system cannot find the file specified)
+2026/08/22 09:53:10 [notice] 12008#17860: signal process started
+2026/08/22 09:53:10 [error] 12008#17860: ReadFile() "D:\Project\ticket-hub-backend\environment\nginx/logs/nginx.pid" failed (1: Incorrect function)
+2026/08/22 09:58:57 [emerg] 15124#14124: CreateFile() "D:\Project\ticket-hub-backend\environment\nginx/logs/nginx.pid" failed (80: The file exists)
+2026/08/22 10:26:46 [error] 21728#3320: *9 connect() failed (10061: No connection could be made because the target machine actively refused it) while connecting to upstream, client: 127.0.0.1, server: localhost, request: "GET /ticket/3/detail/10?version=1787281222255 HTTP/1.1", upstream: "http://127.0.0.1:2244/ticket/3/detail/10?version=1787281222255", host: "localhost"
+2026/08/22 10:26:48 [error] 21728#3320: *9 connect() failed (10061: No connection could be made because the target machine actively refused it) while connecting to upstream, client: 127.0.0.1, server: localhost, request: "GET /ticket/3/detail/10?version=1787281222255 HTTP/1.1", upstream: "http://127.0.0.1:2233/ticket/3/detail/10?version=1787281222255", host: "localhost"
+2026/08/22 10:26:48 [error] 21728#3320: *9 CreateFile() "D:\Project\ticket-hub-backend\environment\nginx/html/50x.html" failed (3: The system cannot find the path specified), client: 127.0.0.1, server: localhost, request: "GET /ticket/3/detail/10?version=1787281222255 HTTP/1.1", upstream: "http://127.0.0.1:2233/ticket/3/detail/10?version=1787281222255", host: "localhost"

@@ -1,0 +1,124 @@
+server:
+  port: 1122
+  tomcat:
+    accept-count: 2000
+    max-connections: 10000
+
+spring:
+  application:
+    name: ticket-hub-backend
+  datasource:
+    hikari:
+      maximum-pool-size: 100
+      minimum-idle: 20
+      connection-timeout: 3000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 5000
+    url: ${MYSQL_URL}
+    username: ${MYSQL_ROOT_USERNAME}
+    password: ${MYSQL_ROOT_PASSWORD}
+  jpa:
+    database: mysql
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+#    properties:
+#      hibernate:
+#        format_sql: true
+#        use_sql_comments: true
+#    open-in-view: false
+
+  mail:
+    port: 465
+    host:
+    username:
+    password:
+    default-encoding: UTF-8
+    properties:
+      mail:
+        auth: true
+        starttls:
+          enable: true
+          required: true
+        ssl:
+          enable: true
+  jackson:
+    serialization:
+      indent-output: true
+  data:
+    redis:
+      host: localhost
+      port: 6319
+      password: ""
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 5
+#          max-wait: -1ms
+      connect-timeout: 30000
+  threads:
+    virtual:
+      enabled: true
+  kafka:
+    bootstrap-servers: localhost:9094
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: order-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "vn.tphcm.ddd.infrastructure.mq"
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+      #        slidingWindowType: TIME_BASED
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+
+  ratelimiter:
+    instances:
+      backendA:
+        limitForPeriod: 2
+        limitRefreshPeriod: 10s
+        timeoutDuration:  0
+        registerHealthIndicator: true
+        eventConsumerBufferSize: 100
+      backendB:
+        limitForPeriod: 5
+        limitRefreshPeriod: 10s
+        timeoutDuration: 3s
+
+jwt:
+  expiryMinutes: 10080
+  expiryDay: 7
+  accessKey: your-access-key
+  refreshKey: your-refresh-key
+
+
+management:
+  health:
+    circuitbreakers:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include:
+          - '*'
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true

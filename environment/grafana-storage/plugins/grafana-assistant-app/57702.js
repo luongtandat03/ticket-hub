@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkgrafana_assistant_app=self.webpackChunkgrafana_assistant_app||[]).push([[57702],{57702(a,t,e){e.r(t),e.d(t,{clearActiveChatId:()=>r,getActiveChatId:()=>i,setActiveChatId:()=>c});const s="grafana-assistant-active-chat-id",c=a=>{localStorage.setItem(s,a)},r=()=>{localStorage.removeItem(s)},i=()=>localStorage.getItem(s)}}]);

@@ -1,0 +1,6 @@
+127.0.0.1 - - [22/Aug/2026:10:12:04 +0700] "GET /ticket/1/detail/1?version=1787281222255 HTTP/1.1" 200 734 "-" "bruno-runtime/4.1.0"
+127.0.0.1 - - [22/Aug/2026:10:12:14 +0700] "GET /ticket/1/detail/1?version=1787281222255 HTTP/1.1" 200 734 "-" "bruno-runtime/4.1.0"
+127.0.0.1 - - [22/Aug/2026:10:12:45 +0700] "GET /ticket/3/detail/1?version=1787281222255 HTTP/1.1" 200 734 "-" "bruno-runtime/4.1.0"
+127.0.0.1 - - [22/Aug/2026:10:12:56 +0700] "GET /ticket/3/detail/3?version=1787281222255 HTTP/1.1" 200 734 "-" "bruno-runtime/4.1.0"
+127.0.0.1 - - [22/Aug/2026:10:15:34 +0700] "GET /ticket/3/detail/10?version=1787281222255 HTTP/1.1" 500 156 "-" "bruno-runtime/4.1.0"
+127.0.0.1 - - [22/Aug/2026:10:26:48 +0700] "GET /ticket/3/detail/10?version=1787281222255 HTTP/1.1" 404 153 "-" "bruno-runtime/4.1.0"

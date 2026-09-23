@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkgrafana_assistant_app=self.webpackChunkgrafana_assistant_app||[]).push([[41960],{35390(a,s,e){e.d(s,{LazyQueryProvider:()=>i});var n=e(56308),r=e(53053),t=e(92847);function i({children:a}){return(0,n.jsx)(r.Ht,{client:t.queryClient,children:a})}},62533(a){a.exports=JSON.parse('{"id":"grafana-assistant-app"}')}}]);

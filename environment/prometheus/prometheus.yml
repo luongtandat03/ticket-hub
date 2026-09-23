@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "ticket-hub-prometheus"
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["host.docker.internal:9090"]
+    metrics_path: "/metrics"
+
+  - job_name: "ticket-hub-springboot"
+    scrape_interval: 5s
+    static_configs:
+      - targets: [ "host.docker.internal:1122" ]
+    metrics_path: "/actuator/prometheus"
+
+  - job_name: "ticket-hub-node-exporter"
+    scrape_interval: 5s
+    static_configs:
+      - targets: [ "host.docker.internal:9100" ]
+
+  - job_name: "ticket-hub-mysqld-exporter"
+    scrape_interval: 5s
+    static_configs:
+      - targets: [ "host.docker.internal:9104" ]
+    metrics_path: "/metrics"
+
+  - job_name: "ticket-hub-redis-exporter"
+    scrape_interval: 5s
+    static_configs:
+      - targets: [ "host.docker.internal:9121" ]
+    metrics_path: "/metrics"

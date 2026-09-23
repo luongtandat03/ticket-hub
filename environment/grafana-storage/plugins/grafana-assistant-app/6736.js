@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkgrafana_assistant_app=self.webpackChunkgrafana_assistant_app||[]).push([[6736],{6736(a,s,e){e.d(s,{createArchitectureServices:()=>t.S});var t=e(89197);e(61184)}}]);
