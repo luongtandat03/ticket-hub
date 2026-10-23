@@ -14,7 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import vn.tphcm.ddd.application.dto.TicketDetailResponse;
+import vn.tphcm.ddd.application.dto.response.TicketDetailResponse;
 import vn.tphcm.ddd.application.service.ticket.TicketDetailAppService;
 import vn.tphcm.ddd.controller.dto.ApiResponse;
 

@@ -11,10 +11,10 @@ package vn.tphcm.ddd.infrastructure.cache.redis.impl;
  */
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import vn.tphcm.ddd.infrastructure.cache.redis.RedisInfrastructureService;
@@ -22,17 +22,18 @@ import vn.tphcm.ddd.infrastructure.cache.redis.RedisInfrastructureService;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j(topic = "REDIS-INFRASTRUCTURE-SERVICE")
 @RequiredArgsConstructor
 public class RedisInfrastructureServiceImpl implements RedisInfrastructureService {
     private static final Duration OBJECT_TTL = Duration.ofMinutes(15);
+    private static final Duration OTP_TTL = Duration.ofMinutes(10);
 
-    @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    private final StringRedisTemplate stringRedisTemplate;
 
     private final ObjectMapper objectMapper;
 
@@ -88,8 +89,7 @@ public class RedisInfrastructureServiceImpl implements RedisInfrastructureServic
             return;
         }
         try {
-            redisTemplate.opsForZSet().add(key, member, System.currentTimeMillis());
-            redisTemplate.expire(key, expire, TimeUnit.SECONDS);
+            stringRedisTemplate.opsForZSet().add(key, member.toString(), expire);
         } catch (Exception e) {
             log.error("zAdd error : {}", e.getMessage());
         }
@@ -98,11 +98,9 @@ public class RedisInfrastructureServiceImpl implements RedisInfrastructureServic
     @Override
     public Set<String> zRangeByScore(String key, long start, long end, int limit) {
         try {
-            Set<Object> result = redisTemplate.opsForZSet().rangeByScore(key, start, end, 0, limit);
+            Set<String> result = stringRedisTemplate.opsForZSet().rangeByScore(key, start, end, 0, limit);
 
-            return result != null ? result.stream()
-                    .map(String::valueOf)
-                    .collect(Collectors.toSet()) : new HashSet<>();
+            return result != null ? result : new HashSet<>();
         } catch (Exception e) {
             log.error("zRangeByScore error : {}", e.getMessage());
         }
@@ -111,12 +109,82 @@ public class RedisInfrastructureServiceImpl implements RedisInfrastructureServic
     }
 
     @Override
-    public void zRemove(String key, String rawMember) {
+    public boolean zRemove(String key, String rawMember) {
         try {
-            log.info("Remove key: {}", key);
-            redisTemplate.delete(key);
+            log.debug("ZREM {} member={}", key, rawMember);
+            Long removed = stringRedisTemplate.opsForZSet().remove(key, rawMember);
+            return removed != null && removed > 0;
         } catch (Exception e) {
             log.error("Failed to remove key : {}", e.getMessage());
+            return false;
         }
+    }
+
+    @Override
+    public void setToken(String key, String token, Duration ttl) {
+        try {
+            log.info("setToken token:{}", token);
+            redisTemplate.opsForValue().set(key, token, ttl);
+        } catch (Exception e) {
+            log.error("Failed to set token : {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public Object getToken(String key) {
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    @Override
+    public void deleteToken(String key) {
+        try {
+            log.info("delete token:{}", key);
+            redisTemplate.delete(key);
+        } catch (Exception e) {
+            log.error("Failed to delete token : {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public void addBlacklistToken(String key, String token, Duration remainingTimeMs) {
+        try {
+            redisTemplate.opsForValue().set(key, token, remainingTimeMs);
+        } catch (Exception e) {
+            log.error("Failed to set blacklist token: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean isBlacklisted(String key) {
+        return key != null && redisTemplate.hasKey(key);
+    }
+
+    @Override
+    public void setOTP(String key, String otp) {
+        try {
+            log.info("setOTP OTP:{}", otp);
+            redisTemplate.opsForValue().set(key, otp, OTP_TTL);
+        } catch (Exception e) {
+            log.error("Failed to set otp : {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public String getString(String key) {
+        try {
+            Object result = redisTemplate.opsForValue().get(key);
+            log.info("getString result:{}", result);
+
+            if (result == null) {
+                return null;
+            }
+
+            return objectMapper.convertValue(result, String.class);
+        } catch (Exception e) {
+            log.error("Failed to get cached string : {}", e.getMessage());
+            deleteObject(key);
+        }
+
+        return null;
     }
 }

@@ -18,7 +18,7 @@ import java.util.List;
 public interface OutboxEventRepository {
     void save(OutboxEvent outboxEvent);
 
-    List<OutboxEvent> findPendingBatch(int limit);
+    List<OutboxEvent> findPendingBatch(String handler, int limit);
 
     void markPublished(String id, LocalDateTime publishedAt);
 

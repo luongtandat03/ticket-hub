@@ -17,9 +17,9 @@ services:
       '--skip-character-set-client-handshake'
     ]
     environment:
-      MYSQL_ROOT_PASSWORD: root1234
-      MYSQL_DATABASE: tickethub
-      MYSQL_PASSWORD: root1234
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DATABASE}
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
       - "3316:3306"
     networks:

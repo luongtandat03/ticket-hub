@@ -12,9 +12,15 @@ package vn.tphcm.ddd.application.cronjob;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import vn.tphcm.ddd.application.schedule.OrderCancelSchedule;
 import vn.tphcm.ddd.infrastructure.mq.order.KafkaOrderProducer;
+import vn.tphcm.ddd.infrastructure.mq.order.OrderCancelMQMessage;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
 
 @Component
 @Slf4j(topic = "ORDER-TIMEOUT")
@@ -27,32 +33,40 @@ public class OrderTimeoutWorker {
 
     private final KafkaOrderProducer kafkaOrderProducer;
 
-//    @Scheduled(fixedRate = 3000)
-//    public void pollAndDispatch() {
-//        List<String> expiredMembers = orderCancelSchedule.pollExpired(BATCH_SIZE);
-//
-//        if (expiredMembers.isEmpty()) {
-//            return;
-//        }
-//
-//        log.debug("[TIMEOUT-WORKER] found {} expired orders", expiredMembers.size());
-//
-//        for (String raw : expiredMembers) {
-//            try {
-//                OrderCancelSchedule.TimeoutPayload payload = orderCancelSchedule.parse(raw);
-//
-//                OrderCancelMQMessage message = new OrderCancelMQMessage(
-//                        payload.getOrderNumber(), payload.getYearMonth(),
-//                        payload.getTicketId(), payload.getQuantity(), LocalDateTime.now(ZoneId.systemDefault())
-//                );
-//
-//                kafkaOrderProducer.sendCancelMessage(message);
-//                orderCancelSchedule.remove(raw);
-//
-//                log.info("[TIMEOUT-WORKER] dispathed cancel event orderNumber = {}", payload.getOrderNumber());
-//            } catch (Exception e) {
-//                log.error("[TIMEOUT-WORKER] failed to send cancel message", e);
-//            }
-//        }
-//    }
+    @Scheduled(fixedDelay = 3000)
+    public void pollAndDispatch() {
+        List<String> expiredMembers = orderCancelSchedule.pollExpired(BATCH_SIZE);
+
+        if (expiredMembers.isEmpty()) {
+            return;
+        }
+
+        log.debug("[TIMEOUT-WORKER] found {} expired orders", expiredMembers.size());
+
+        for (String raw : expiredMembers) {
+            if (!orderCancelSchedule.remove(raw)){
+                continue;
+            }
+
+            OrderCancelSchedule.TimeoutPayload payload = null;
+
+            try {
+                payload = orderCancelSchedule.parse(raw);
+
+                OrderCancelMQMessage message = new OrderCancelMQMessage(
+                        payload.getOrderNumber(), payload.getYearMonth(),
+                        payload.getTicketId(), payload.getQuantity(), LocalDateTime.now(ZoneId.systemDefault())
+                );
+
+                kafkaOrderProducer.sendCancelMessage(message);
+
+                log.info("[TIMEOUT-WORKER] dispathed cancel event orderNumber = {}", payload.getOrderNumber());
+            } catch (Exception e) {
+                log.error("[TIMEOUT-WORKER] failed to send cancel message", e);
+                if (payload != null) {
+                    orderCancelSchedule.scheduleAt(payload, System.currentTimeMillis());
+                }
+            }
+        }
+    }
 }

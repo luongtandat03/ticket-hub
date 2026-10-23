@@ -13,7 +13,6 @@ package vn.tphcm.ddd.infrastructure.persistence.repository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import vn.tphcm.ddd.domain.model.OutboxEvent;
 import vn.tphcm.ddd.domain.repository.OutboxEventRepository;
@@ -34,8 +33,8 @@ public class OutboxEventInfraRepositoryImpl implements OutboxEventRepository {
     }
 
     @Override
-    public List<OutboxEvent> findPendingBatch(int limit) {
-        return outboxEventJPAMapper.findPending(PageRequest.of(0, limit));
+    public List<OutboxEvent> findPendingBatch(String eventType, int limit) {
+        return outboxEventJPAMapper.findPending(eventType, limit);
     }
 
     @Override

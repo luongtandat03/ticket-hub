@@ -6,7 +6,6 @@
 
 package vn.tphcm.ddd.infrastructure.persistence.mapper;
 
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -23,8 +22,10 @@ import java.util.List;
 
 public interface OutboxEventJPAMapper extends JpaRepository<OutboxEvent, String> {
 
-    @Query("SELECT e FROM OutboxEvent e WHERE e.status = 0 ORDER BY e.createdAt ASC ")
-    List<OutboxEvent> findPending(Pageable pageable);
+    @Query(value = """
+            SELECT * FROM tbl_outbox_event WHERE status = 0 AND event_type = :eventType ORDER BY created_at ASC LIMIT :limit FOR UPDATE SKIP LOCKED
+            """, nativeQuery = true)
+    List<OutboxEvent> findPending(@Param("eventType") String eventType, @Param("limit") int limit);
 
     @Modifying
     @Query("UPDATE OutboxEvent e SET e.status = 1, " +
@@ -35,7 +36,7 @@ public interface OutboxEventJPAMapper extends JpaRepository<OutboxEvent, String>
     @Modifying
     @Query("UPDATE OutboxEvent e SET e.status = 1, " +
             "e.publishedAt = :publishedAt " +
-            "WHERE e.id = :id")
+            "WHERE e.id = :id AND e.status = 0")
     void markPublishedById(@Param("id") String id, @Param("publishedAt") LocalDateTime publishedAt);
 
 }

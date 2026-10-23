@@ -1,8 +1,9 @@
 server:
-  port: 1122
+  port: ${BACKEND_IP}
   tomcat:
     accept-count: 2000
     max-connections: 10000
+#  forward-headers-strategy: native
 
 spring:
   application:
@@ -10,7 +11,7 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: 100
-      minimum-idle: 20
+      minimum-idle: 100
       connection-timeout: 3000
       validation-timeout: 1000
       idle-timeout: 600000
@@ -19,9 +20,10 @@ spring:
     url: ${MYSQL_URL}
     username: ${MYSQL_ROOT_USERNAME}
     password: ${MYSQL_ROOT_PASSWORD}
+
   jpa:
     database: mysql
-    show-sql: true
+    show-sql: false
     hibernate:
       ddl-auto: none
 #    properties:
@@ -31,19 +33,22 @@ spring:
 #    open-in-view: false
 
   mail:
-    port: 465
-    host:
-    username:
-    password:
+    port: 587
+    host: smtp.gmail.com
+    username: mailcv098@gmail.com
+    password: ${MAIL_PASSWORD}
     default-encoding: UTF-8
     properties:
       mail:
-        auth: true
-        starttls:
-          enable: true
-          required: true
-        ssl:
-          enable: true
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   jackson:
     serialization:
       indent-output: true
@@ -73,7 +78,8 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: "vn.tphcm.ddd.infrastructure.mq"
+        spring.json.trusted.packages: "vn.tphcm.ddd.infrastructure.mq.*"
+      max-poll-records: 100
 
 resilience4j:
   circuitbreaker:
@@ -101,12 +107,25 @@ resilience4j:
         limitRefreshPeriod: 10s
         timeoutDuration: 3s
 
-jwt:
-  expiryMinutes: 10080
-  expiryDay: 7
-  accessKey: your-access-key
-  refreshKey: your-refresh-key
+rate-limit:
+  enable: true
 
+jwt:
+  expiryMinutes: ${EXPIRY_MINUTES}
+  expiryDay: ${EXPIRY_DAY}
+  accessKey: ${ACCESS_KEY}
+  refreshKey: ${REFRESH_KEY}
+
+vnp:
+  terminalId: ${TERMINAL_ID}
+  secretKey: ${SECRET_KEY}
+  url: ${VNP_URL}
+  ip: ${IP}
+  returnUrl: http://${IP}:${BACKEND_IP}/payment/callback
+  apiUrl: ${VNP_API_URL}
+
+frontend:
+  url: ${FRONTEND_URL}
 
 management:
   health:
@@ -122,3 +141,8 @@ management:
       show-details: always
     prometheus:
       enabled: true
+logging:
+  level:
+    root: warn
+    web: warn
+    sql: warn

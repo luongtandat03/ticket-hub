@@ -19,10 +19,10 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PageResponse <T>{
+public class PageResponse<T> {
     private List<T> content;
 
-    private Long nextCursor;
+    private String nextCursor;
 
     private boolean hasMore;
 }

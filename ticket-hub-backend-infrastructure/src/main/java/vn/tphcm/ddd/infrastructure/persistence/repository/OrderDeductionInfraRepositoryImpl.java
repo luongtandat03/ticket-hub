@@ -81,7 +81,7 @@ public class OrderDeductionInfraRepositoryImpl implements OrderDeductionReposito
     @Override
     public List<Object[]> findByDateRange(String yearMonth, LocalDateTime startDate, LocalDateTime endDate) {
         String tableName = genTableName(yearMonth);
-        String sql = "SELECT * FROM" + tableName + " WHERE order_date = :startDate AND order_date = :endDate";
+        String sql = "SELECT * FROM " + tableName + " WHERE order_date BETWEEN :startDate AND :endDate";
         return entityManager.createNativeQuery(sql)
                 .setParameter("startDate", startDate)
                 .setParameter("endDate", endDate)
@@ -122,12 +122,55 @@ public class OrderDeductionInfraRepositoryImpl implements OrderDeductionReposito
         return result > 0;
     }
 
-    private String genOrderNumber(String userId) {
-        return "OKS-SGN" + "-" + System.currentTimeMillis() + "-" + userId.replace("-", "");
+    @Override
+    public boolean compareAndSetOrderStatus(String yearMonth, String orderNumber, int expectedStatus, int newStatus) {
+        String tableName = genTableName(yearMonth);
+
+        String sql = "UPDATE " + tableName +
+                " SET order_status = :newStatus, updated_at = :updatedAt" +
+                " WHERE order_number = :orderNumber" +
+                " AND order_status = :expectedStatus";
+
+        int result = entityManager.createNativeQuery(sql)
+                .setParameter("newStatus", newStatus)
+                .setParameter("updatedAt", LocalDateTime.now(ZoneId.systemDefault()))
+                .setParameter("orderNumber", orderNumber)
+                .setParameter("expectedStatus", expectedStatus)
+                .executeUpdate();
+
+        return result > 0;
+    }
+
+    @Override
+    public List<String> findExpiredPendingOrderNumbers(String yearMonth, LocalDateTime createdBefore, int limit) {
+        String tableName = genTableName(yearMonth);
+
+        if (!tableExists(tableName)) {
+            return List.of();
+        }
+
+        String sql = "SELECT order_number FROM " + tableName +
+                " WHERE order_status = 0" +
+                " AND created_at < :createdBefore" +
+                " ORDER BY created_at LIMIT :limit";
+
+        return entityManager.createNativeQuery(sql)
+                .setParameter("createdBefore", createdBefore)
+                .setParameter("limit", limit)
+                .getResultList();
     }
 
     private String genTableName(String yearMonth) {
         return TABLE_PREFIX + yearMonth;
+    }
+
+    private boolean tableExists(String tableName) {
+        Number count = (Number) entityManager.createNativeQuery(
+                        "SELECT COUNT(*) FROM information_schema.tables " +
+                                "WHERE table_schema = DATABASE() AND table_name = :tableName")
+                .setParameter("tableName", tableName)
+                .getSingleResult();
+        return count.intValue() > 0;
     }
 
 
@@ -138,7 +181,7 @@ public class OrderDeductionInfraRepositoryImpl implements OrderDeductionReposito
                     "ticket_id VARCHAR(36) NOT NULL, " +
                     "order_number VARCHAR(54) NOT NULL COMMENT 'Order Number', " +
                     "quantity INT NOT NULL DEFAULT 1, " +
-                    "order_status INT NOT NULL DEFAULT 0 COMMENT '0:Order, 1: Pending, 2: Cancel, 3: Complete', " +
+                    "order_status INT NOT NULL DEFAULT 0 COMMENT '0: Pending payment, 1: Paid, 2: Cancelled', " +
                     "total_amount DECIMAL(15, 2) NOT NULL COMMENT 'Total Amount', " +
                     "terminal_id VARCHAR(36) NOT NULL COMMENT 'Terminal Id', " +
                     "order_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Order Date', " +
@@ -149,7 +192,8 @@ public class OrderDeductionInfraRepositoryImpl implements OrderDeductionReposito
                     "UNIQUE KEY uk_order_number (order_number), " +
                     "KEY idx_user_id (user_id), " +
                     "KEY idx_ticket_id (ticket_id), " +
-                    "KEY idx_order_date (order_date) " +
+                    "KEY idx_order_date (order_date), " +
+                    "INDEX `idx_status_created` (order_status,created_at) " +
                     " ) ENGINE=InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci; ";
 
     private static final Map<String, Boolean> totalCreatedCache = new ConcurrentHashMap<>();

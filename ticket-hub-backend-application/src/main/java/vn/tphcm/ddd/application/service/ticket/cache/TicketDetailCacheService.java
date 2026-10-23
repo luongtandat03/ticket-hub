@@ -15,7 +15,7 @@ import com.google.common.cache.CacheBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import vn.tphcm.ddd.application.dto.TicketDetailResponse;
+import vn.tphcm.ddd.application.dto.response.TicketDetailResponse;
 import vn.tphcm.ddd.application.mapper.TicketDetailMapper;
 import vn.tphcm.ddd.domain.model.TicketDetail;
 import vn.tphcm.ddd.domain.service.TicketDetailDomainService;
@@ -52,47 +52,46 @@ public class TicketDetailCacheService {
         TicketDetailResponse ticketDetailResponse = getTicketDetailLocalCache(id);
 
         if (ticketDetailResponse != null) {
-            log.info("TicketDetailResponse found for id {} and version {}", id, version);
+//            log.info("TicketDetailResponse found for id {} and version {}", id, version);
 
             if (version == null) {
-                log.info("01.Get Ticket from local cache for versionUser {} and versionLocal {} ", version, ticketDetailResponse.getVersion());
+//                log.debug("01.Get Ticket from local cache for versionLocal {} ", ticketDetailResponse.getVersion());
                 return ticketDetailResponse;
             }
 
             if (version.equals(ticketDetailResponse.getVersion()) || version < ticketDetailResponse.getVersion()) {
-                log.info("02.Get Ticket from local cache for versionUser {} and versionLocal {} ", version, ticketDetailResponse.getVersion());
+//                log.info("02.Get Ticket from local cache for versionUser {} and versionLocal {} ", version, ticketDetailResponse.getVersion());
                 return ticketDetailResponse;
             }
 
-            log.info("03. Get Ticket from database for versionUser {} and versionLocal {}", version, ticketDetailResponse.getVersion());
-            return getTicketDetailDatabase(id);
+//            log.info("03. Get Ticket from database for versionUser {} and versionLocal {}", version, ticketDetailResponse.getVersion());
+            return getTicketDetailDatabase(id, version);
         }
 
         return getTicketDetailCache(id);
     }
 
     /**
-     * Get Ticket Detail in Local Cache
+     * Get Ticket Detail in Cache
      */
     private TicketDetailResponse getTicketDetailCache(String id) {
         TicketDetailResponse ticketDetailResponse = redisInfrastructureService.getObject(genEventItemKey(id), TicketDetailResponse.class);
 
         if (ticketDetailResponse != null) {
-            log.info("Get ticket from cache");
-            ticketDetailLocalCache.put(id, ticketDetailResponse);
+//            log.info("Get ticket from cache");
+            ticketDetailLocalCache.put(genEventItemKey(id), ticketDetailResponse);
             return ticketDetailResponse;
         }
 
-        log.info("Get Ticket from distributed locker");
-        ticketDetailResponse = getTicketDetailDatabase(id);
+//        log.info("Get Ticket from distributed locker");
 
-        return ticketDetailResponse;
+        return getTicketDetailDatabase(id, null);
     }
 
     /**
      * Get Ticket Detail in Database
      */
-    private TicketDetailResponse getTicketDetailDatabase(String id) {
+    private TicketDetailResponse getTicketDetailDatabase(String id, Long version) {
         RedisDistributedLocker locker = redisDistributedService.getRedisDistributedLock(genEventItemKeyLock(id));
 
         try {
@@ -104,13 +103,13 @@ public class TicketDetailCacheService {
 
             TicketDetailResponse ticketDetailResponse = redisInfrastructureService.getObject(genEventItemKey(id), TicketDetailResponse.class);
 
-            if (ticketDetailResponse != null) {
+            if (ticketDetailResponse != null && (version == null || ticketDetailResponse.getVersion() >= version)) {
                 return ticketDetailResponse;
             }
 
             TicketDetail ticketDetail = ticketDetailDomainService.getTicketDefaultCacheVip(id);
             if (ticketDetail == null) {
-                log.info("Set Null to Redis");
+//                log.info("Set Null to Redis");
                 redisInfrastructureService.setObject(genEventItemKey(id), null);
                 return null;
             }
@@ -118,7 +117,7 @@ public class TicketDetailCacheService {
             ticketDetailResponse = ticketDetailMapper.toDto(ticketDetail);
             ticketDetailResponse.setVersion(System.currentTimeMillis());
 
-            log.info("Set Ticket Detail to Redis");
+//            log.info("Set Ticket Detail to Redis");
             redisInfrastructureService.setObject(genEventItemKey(id), ticketDetailResponse);
 
             return ticketDetailResponse;
@@ -131,16 +130,16 @@ public class TicketDetailCacheService {
     }
 
     public boolean orderTicketByUser(String ticketId) {
-        ticketDetailLocalCache.invalidate(ticketId); // remove local cache
+        ticketDetailLocalCache.invalidate(genEventItemKey(ticketId)); // remove local cache
         redisInfrastructureService.deleteObject(genEventItemKey(ticketId));
         return true;
     }
 
 
     private TicketDetailResponse getTicketDetailLocalCache(String id) {
-        log.info("Implement get Ticket in Redis for id {}", id);
+//        log.info("Implement get Ticket in Redis for id {}", id);
         try {
-            return ticketDetailLocalCache.getIfPresent(id);
+            return ticketDetailLocalCache.getIfPresent(genEventItemKey(id));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

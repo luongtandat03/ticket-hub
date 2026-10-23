@@ -15,15 +15,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import vn.tphcm.ddd.application.dto.PageResponse;
-import vn.tphcm.ddd.application.dto.PlaceOrderResponse;
-import vn.tphcm.ddd.application.dto.TicketOrderResponse;
-import vn.tphcm.ddd.application.service.order.OrderMQAppService;
+import vn.tphcm.ddd.application.dto.response.PlaceOrderResponse;
+import vn.tphcm.ddd.application.dto.response.TicketOrderResponse;
 import vn.tphcm.ddd.application.service.order.TicketOrderAppService;
 import vn.tphcm.ddd.controller.dto.ApiResponse;
 import vn.tphcm.ddd.controller.dto.request.CreateBookingRequest;
-import vn.tphcm.ddd.controller.dto.request.PlaceOrderMQRequest;
-import vn.tphcm.ddd.domain.model.OrderQueue;
-import vn.tphcm.ddd.domain.model.TicketOrder;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,12 +46,11 @@ public class TicketOrderController {
                 .build();
     }
 
-    @GetMapping("/{userId}/list")
+    @GetMapping("/list")
     public ApiResponse<List<TicketOrderResponse>> getListTicketByUser(
-            @PathVariable("userId") String userId,
             @RequestParam("nTable") String nTable
     ) {
-        log.info("Get list ticket by user | {}, {}", userId, nTable);
+        log.info("Get list ticket by user | {}", nTable);
         return ApiResponse.<List<TicketOrderResponse>>builder()
                 .status(OK.value())
                 .data(ticketOrderAppService.findAll(nTable))
@@ -64,12 +59,11 @@ public class TicketOrderController {
                 .build();
     }
 
-    @GetMapping("/{userId}/{orderNumber}")
+    @GetMapping("/{orderNumber}")
     public ApiResponse<TicketOrderResponse> getTicketByOrderNumber(
-            @PathVariable("userId") String userId,
             @PathVariable("orderNumber") String orderNumber
     ) {
-        log.info("Get ticket by order | {}, {}", userId, orderNumber);
+        log.info("Get ticket by order | {}", orderNumber);
         return ApiResponse.<TicketOrderResponse>builder()
                 .status(OK.value())
                 .data(ticketOrderAppService.findByOrderNumber(orderNumber))
@@ -78,14 +72,13 @@ public class TicketOrderController {
                 .build();
     }
 
-    @GetMapping("/{userId}/{startDate}/{endDate}")
+    @GetMapping("/{startDate}/{endDate}")
     public ApiResponse<List<TicketOrderResponse>> getTicketByDateRange(
-            @PathVariable("userId") String userId,
             @PathVariable("startDate") LocalDateTime startDate,
             @PathVariable("endDate") LocalDateTime endDate,
             @RequestParam("nTable") String nTable
     ) {
-        log.info("Get ticket by date |{}, {}, {}", userId, startDate, endDate);
+        log.info("Get ticket by date |{}, {}", startDate, endDate);
         return ApiResponse.<List<TicketOrderResponse>>builder()
                 .status(OK.value())
                 .message("Get ticket by date successful")
@@ -94,14 +87,13 @@ public class TicketOrderController {
                 .build();
     }
 
-    @GetMapping("/{userId}/list/page")
+    @GetMapping("/list/page")
     public ApiResponse<PageResponse<TicketOrderResponse>> getListOrderByUserPaged(
-            @PathVariable("userId") String userId,
             @RequestParam("nTable") String nTable,
             @RequestParam(value = "cursor", defaultValue = "") String cursor,
             @RequestParam(value = "limit", defaultValue = "50") int limit
     ) {
-        log.info("Get list ticket order with userId: {} cursor: {} limit: {}", userId, cursor, limit);
+        log.info("Get list ticket order with cursor: {} limit: {}", cursor, limit);
         return ApiResponse.<PageResponse<TicketOrderResponse>>builder()
                 .status(OK.value())
                 .message("Get list ticket order successful")
@@ -110,17 +102,16 @@ public class TicketOrderController {
                 .build();
     }
 
-    @DeleteMapping("/{userId}/{orderNumber}/cancel")
+    @DeleteMapping("/{orderNumber}/cancel")
     public ApiResponse<Boolean> cancelTicketByOrderNumber(
-            @PathVariable("userId") String userId,
             @PathVariable("orderNumber") String orderNumber
     ) {
-        log.info("Cancel ticket by order | {}, {}", userId, orderNumber);
+        log.info("Cancel ticket by order | {}", orderNumber);
 
         return ApiResponse.<Boolean>builder()
                 .status(OK.value())
                 .message("Cancel ticket by order successful")
-                .data(ticketOrderAppService.cancelOrder(userId, orderNumber))
+                .data(ticketOrderAppService.cancelOrder(orderNumber))
                 .timestamp(System.currentTimeMillis())
                 .build();
     }
@@ -135,4 +126,5 @@ public class TicketOrderController {
                 .timestamp(System.currentTimeMillis())
                 .build();
     }
+
 }

@@ -13,10 +13,9 @@ package vn.tphcm.ddd.application.service.ticket.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import vn.tphcm.ddd.application.dto.TicketDetailResponse;
+import vn.tphcm.ddd.application.dto.response.TicketDetailResponse;
 import vn.tphcm.ddd.application.service.ticket.TicketDetailAppService;
 import vn.tphcm.ddd.application.service.ticket.cache.TicketDetailCacheService;
-import vn.tphcm.ddd.domain.model.TicketDetail;
 
 @Service
 @RequiredArgsConstructor

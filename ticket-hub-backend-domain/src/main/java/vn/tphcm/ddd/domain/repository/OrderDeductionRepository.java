@@ -6,8 +6,6 @@
 
 package vn.tphcm.ddd.domain.repository;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import vn.tphcm.ddd.domain.model.TicketOrder;
 
 import java.time.LocalDateTime;
@@ -19,9 +17,19 @@ import java.util.List;
  */
 public interface OrderDeductionRepository {
     void insertOrder(String yearMonth, TicketOrder ticketOrder);
+
     List<Object[]> findAll(String yearMonth);
+
     Object[] findByOrderNumber(String nTable, String orderNumber);
+
     List<Object[]> findByDateRange(String yearMonth, LocalDateTime startDate,  LocalDateTime endDate);
+
     List<Object[]> findPage(String yearMonth, String lastId, int limit);
+
     boolean updateOrderStatus(String yearMonth, String orderNumber, int orderStatus);
+
+    boolean compareAndSetOrderStatus(String yearMonth, String orderNumber, int expectedStatus, int newStatus);
+
+    List<String> findExpiredPendingOrderNumbers(String yearMonth, LocalDateTime createdBefore, int limit);
+
 }

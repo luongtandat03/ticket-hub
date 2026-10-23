@@ -14,7 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import vn.tphcm.ddd.application.dto.PlaceOrderResponse;
+import vn.tphcm.ddd.application.dto.response.PlaceOrderResponse;
 import vn.tphcm.ddd.application.service.order.OrderMQAppService;
 import vn.tphcm.ddd.controller.dto.ApiResponse;
 import vn.tphcm.ddd.controller.dto.request.PlaceOrderMQRequest;

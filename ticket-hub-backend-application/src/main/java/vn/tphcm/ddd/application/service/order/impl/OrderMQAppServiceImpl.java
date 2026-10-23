@@ -11,15 +11,17 @@ package vn.tphcm.ddd.application.service.order.impl;
  */
 
 import com.alibaba.fastjson.JSON;
-import com.github.f4b6a3.uuid.UuidCreator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import vn.tphcm.ddd.application.service.order.OrderMQAppService;
 import vn.tphcm.ddd.application.service.order.cache.StockOrderCacheService;
 import vn.tphcm.ddd.domain.model.OrderQueue;
 import vn.tphcm.ddd.domain.model.OutboxEvent;
+import vn.tphcm.ddd.domain.model.User;
 import vn.tphcm.ddd.domain.repository.OrderQueueRepository;
 import vn.tphcm.ddd.domain.repository.OutboxEventRepository;
 import vn.tphcm.ddd.infrastructure.mq.order.PlaceOrderMQMessage;
@@ -47,7 +49,7 @@ public class OrderMQAppServiceImpl implements OrderMQAppService {
 
     @Override
     public OrderQueue placeOrderMQ(String ticketId, int quantity) {
-        int redisResult = stockOrderCacheService.decreaseStockCacheByLua(ticketId, quantity);
+        int redisResult = stockOrderCacheService.decreaseStockCache(ticketId, quantity);
 
         if (redisResult == -1) {
             log.info("placeOrderMQ: cache miss for ticketId={}, warming up...", ticketId);
@@ -56,7 +58,7 @@ public class OrderMQAppServiceImpl implements OrderMQAppService {
                 return failedQueue(NOT_FOUND, "Not found event");
             }
 
-            redisResult = stockOrderCacheService.decreaseStockCacheByLua(ticketId, quantity);
+            redisResult = stockOrderCacheService.decreaseStockCache(ticketId, quantity);
         }
 
         if (redisResult == 0) {
@@ -72,15 +74,17 @@ public class OrderMQAppServiceImpl implements OrderMQAppService {
             return failedQueue(PRICE_NOT_FOUND, "Do not confirm price");
         }
 
-        String userId = UuidCreator.getTimeOrderedEpoch().toString();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        User user = (User) authentication.getPrincipal();
 
         String token = "MQ-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
 
         try {
-            OrderQueue queue = transactionTemplate.execute(txStatus -> {
+            OrderQueue queue = transactionTemplate.execute(_ -> {
                 OrderQueue orderQueue = OrderQueue.builder()
                         .token(token)
-                        .userId(userId)
+                        .userId(user.getId())
                         .ticketId(ticketId)
                         .quantity(quantity)
                         .status(0)
@@ -91,11 +95,12 @@ public class OrderMQAppServiceImpl implements OrderMQAppService {
                 orderQueueRepository.save(orderQueue);
 
                 PlaceOrderMQMessage message = new PlaceOrderMQMessage(
-                        token, ticketId, quantity, userId, unitPrice, System.currentTimeMillis()
+                        token, ticketId, quantity, user.getId(), unitPrice, System.currentTimeMillis()
                 );
+
                 OutboxEvent event = OutboxEvent.builder()
                         .aggregateId(token)
-                        .eventType("ORDER_PLACED")
+                        .eventType("PLACE_ORDER")
                         .payload(JSON.toJSONString(message))
                         .status(0)
                         .createdAt(LocalDateTime.now(ZoneId.systemDefault()))

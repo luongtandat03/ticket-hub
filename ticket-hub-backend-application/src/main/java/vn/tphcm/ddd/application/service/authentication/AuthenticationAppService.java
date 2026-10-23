@@ -10,10 +10,17 @@ package vn.tphcm.ddd.application.service.authentication;
  * @date: 9/21/2026
  */
 
-import vn.tphcm.ddd.application.dto.SignInResponse;
+import vn.tphcm.ddd.application.dto.response.SignInResponse;
+import vn.tphcm.ddd.application.dto.response.UserResponse;
 
 public interface AuthenticationAppService {
-    SignInResponse login(String username, String password);
+    SignInResponse login(String usernameOrEmailOrPhoneNumber, String password);
 
-    Boolean confirmCode(String code);
+    UserResponse register(String username, String email, String password, String phoneNumber);
+
+    SignInResponse confirmCode(String username, String code);
+
+    Void logout(String jwt);
+
+    Void forgotPassword(String email);
 }

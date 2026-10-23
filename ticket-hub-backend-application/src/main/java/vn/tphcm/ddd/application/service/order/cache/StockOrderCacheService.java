@@ -14,8 +14,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
-import vn.tphcm.ddd.application.dto.TicketDetailResponse;
+import vn.tphcm.ddd.application.dto.response.TicketDetailResponse;
 import vn.tphcm.ddd.application.service.ticket.cache.TicketDetailCacheService;
+import vn.tphcm.ddd.domain.model.TicketDetail;
+import vn.tphcm.ddd.domain.service.TicketDetailDomainService;
 import vn.tphcm.ddd.infrastructure.cache.redis.RedisInfrastructureService;
 
 import java.math.BigDecimal;
@@ -26,7 +28,7 @@ import java.util.Collections;
 @RequiredArgsConstructor
 public class StockOrderCacheService {
     private final TicketDetailCacheService ticketDetailCacheService;
-
+    private final TicketDetailDomainService ticketDetailDomainService;
     private final RedisInfrastructureService redisInfrastructureService;
 
     private static final String LUA_DEDUCT =
@@ -55,9 +57,9 @@ public class StockOrderCacheService {
             return false;
         }
 
-        TicketDetailResponse response = ticketDetailCacheService.getTicketDetail(ticketId, null);
+        TicketDetail ticket = ticketDetailDomainService.getTicketDefaultCacheVip(ticketId);
 
-        if (response == null) {
+        if (ticket == null) {
             return false;
         }
 
@@ -65,7 +67,8 @@ public class StockOrderCacheService {
 
         log.info("get -> getKeyStockCache: {}", keyStockCache);
 
-        redisInfrastructureService.setObject(keyStockCache, response.getStockAvailable());
+        redisInfrastructureService.redisTemplate().opsForValue()
+                .setIfAbsent(keyStockCache, ticket.getStockAvailable());
 
         return true;
     }
@@ -79,7 +82,7 @@ public class StockOrderCacheService {
         return result.intValue();
     }
 
-    public int decreaseStockCacheByLua(String ticketId, Integer quantity) {
+    public int decreaseStockCache(String ticketId, Integer quantity) {
         String keyStockLUA = genKeyStockItemCache(ticketId);
 
         String resultLua =

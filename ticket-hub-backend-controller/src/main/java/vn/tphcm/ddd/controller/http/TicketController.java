@@ -13,7 +13,7 @@ package vn.tphcm.ddd.controller.http;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import vn.tphcm.ddd.application.dto.TicketResponse;
+import vn.tphcm.ddd.application.dto.response.TicketResponse;
 import vn.tphcm.ddd.application.service.ticket.TicketAppService;
 import vn.tphcm.ddd.controller.dto.ApiResponse;
 
@@ -40,12 +40,13 @@ public class TicketController {
 
     @GetMapping
     public ApiResponse<List<TicketResponse>> getTicketByStatus(
-            @RequestParam(value = "version", required = false) String version
+            @RequestParam(value = "version", required = false) Long version,
+            @RequestParam(value = "status", defaultValue = "1") Integer status
     ) {
         return ApiResponse.<List<TicketResponse>>builder()
                 .status(OK.value())
                 .message("Get Ticket Success")
-                .data(ticketAppService.getTicketsByStatus(1, version))
+                .data(ticketAppService.getTicketsByStatus(status, version))
                 .timestamp(System.currentTimeMillis())
                 .build();
     }

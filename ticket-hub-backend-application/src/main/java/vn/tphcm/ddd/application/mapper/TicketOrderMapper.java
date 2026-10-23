@@ -12,7 +12,7 @@ package vn.tphcm.ddd.application.mapper;
  */
 
 import org.mapstruct.Mapper;
-import vn.tphcm.ddd.application.dto.TicketOrderResponse;
+import vn.tphcm.ddd.application.dto.response.TicketOrderResponse;
 import vn.tphcm.ddd.domain.model.TicketOrder;
 
 @Mapper(componentModel = "spring")

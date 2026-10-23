@@ -25,7 +25,7 @@ public class KafkaEmailProducer {
     private final KafkaTemplate<String, EmailMQMessage> kafkaTemplate;
 
     public void sendAndAwaitAck(EmailMQMessage message) throws Exception {
-        kafkaTemplate.send(KafkaTopicConfig.ORDER_PLACE_TOPIC, message)
+        kafkaTemplate.send(KafkaTopicConfig.EMAIL_TOPIC, message)
                 .get(5, TimeUnit.SECONDS);
     }
 }

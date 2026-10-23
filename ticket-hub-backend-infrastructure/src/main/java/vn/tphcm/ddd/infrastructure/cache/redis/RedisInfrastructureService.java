@@ -8,6 +8,7 @@ package vn.tphcm.ddd.infrastructure.cache.redis;
 
 import org.springframework.data.redis.core.RedisTemplate;
 
+import java.time.Duration;
 import java.util.Set;
 
 /*
@@ -29,5 +30,20 @@ public interface RedisInfrastructureService {
 
     Set<String> zRangeByScore(String key, long start, long end, int limit);
 
-    void zRemove(String key, String rawMember);
+    boolean zRemove(String key, String rawMember);
+
+    void setToken(String key, String token, Duration ttl);
+
+    Object getToken(String key);
+
+    void deleteToken(String key);
+
+    void addBlacklistToken(String key, String token, Duration remainingTimeMs);
+
+    boolean isBlacklisted(String key);
+
+    void setOTP(String key, String otp);
+
+    String getString(String key);
+
 }

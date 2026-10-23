@@ -6,8 +6,7 @@
 
 package vn.tphcm.ddd.application.service.ticket;
 
-import vn.tphcm.ddd.application.dto.TicketDetailResponse;
-import vn.tphcm.ddd.domain.model.TicketDetail;
+import vn.tphcm.ddd.application.dto.response.TicketDetailResponse;
 
 /*
  * @author: Luong Tan Dat

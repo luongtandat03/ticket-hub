@@ -11,10 +11,6 @@ package vn.tphcm.ddd.application.mapper;
  */
 
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.Mappings;
-import vn.tphcm.ddd.application.dto.PlaceOrderResponse;
-import vn.tphcm.ddd.domain.model.OrderQueue;
 
 @Mapper(componentModel = "spring")
 public interface OrderMQMapper {

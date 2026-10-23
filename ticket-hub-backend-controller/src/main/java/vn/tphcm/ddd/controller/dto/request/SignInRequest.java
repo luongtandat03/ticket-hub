@@ -10,10 +10,15 @@ package vn.tphcm.ddd.controller.dto.request;
  * @date: 9/21/2026
  */
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
+@NoArgsConstructor
 public class SignInRequest {
+    @NotBlank
     private String usernameOrEmailOrPhoneNumber;
+    @NotBlank
     private String password;
 }

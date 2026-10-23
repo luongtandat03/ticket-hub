@@ -12,8 +12,6 @@ package vn.tphcm.ddd.domain.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.tphcm.ddd.domain.model.TicketOrder;
@@ -58,6 +56,16 @@ public class OrderDeductionDomainServiceImpl implements OrderDeductionDomainServ
     @Override
     public boolean updateOrderStatus(String yearMonth, String orderNumber, int orderStatus) {
         return orderDeductionRepository.updateOrderStatus(yearMonth, orderNumber, orderStatus);
+    }
+
+    @Override
+    public boolean compareAndSetOrderStatus(String yearMonth, String orderNumber, int expectedStatus, int newStatus) {
+        return orderDeductionRepository.compareAndSetOrderStatus(yearMonth, orderNumber, expectedStatus, newStatus);
+    }
+
+    @Override
+    public List<String> findExpiredPendingOrderNumbers(String yearMonth, LocalDateTime createdBefore, int limit) {
+        return orderDeductionRepository.findExpiredPendingOrderNumbers(yearMonth, createdBefore, limit);
     }
 
 

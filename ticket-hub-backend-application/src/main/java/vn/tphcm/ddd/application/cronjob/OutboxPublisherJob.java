@@ -15,8 +15,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import vn.tphcm.ddd.application.service.outbox.OutboxHandler;
+import vn.tphcm.ddd.application.service.outbox.impl.EmailOutboxHandler;
+import vn.tphcm.ddd.application.service.outbox.impl.PlaceOrderOutboxHandler;
 import vn.tphcm.ddd.domain.model.OutboxEvent;
 import vn.tphcm.ddd.domain.repository.OutboxEventRepository;
+import vn.tphcm.ddd.infrastructure.mq.email.KafkaEmailProducer;
 import vn.tphcm.ddd.infrastructure.mq.order.KafkaOrderProducer;
 import vn.tphcm.ddd.infrastructure.mq.order.PlaceOrderMQMessage;
 
@@ -34,12 +38,23 @@ public class OutboxPublisherJob {
 
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaOrderProducer kafkaOrderProducer;
+    private final PlaceOrderOutboxHandler placeOrderOutboxHandler;
+    private final EmailOutboxHandler emailOutboxHandler;
 
-    @Scheduled(fixedRate = 1000) // Run sau mỗi giây bất kể lần trước xong hay không
-    public void publish() {
-        publishRowByRow();
+    /**
+     * // FixedRate: Run sau mỗi giây bất kể lần trước xong hay không
+     * // FixedDelay: Sau khi lần trước xong, đợi 1s sau rồi
+     */
+
+    @Scheduled(fixedRate = 1000)
+    public void publishOrders() {
+        publishBatch(placeOrderOutboxHandler);
     }
 
+    @Scheduled(fixedDelay = 1000)
+    public void publishEmails() {
+        publishRowByRow(emailOutboxHandler);
+    }
     /**
      * Row-by-row
      * <p>
@@ -48,15 +63,14 @@ public class OutboxPublisherJob {
      * - DB round trip big
      * - Low Throughput
      */
-    private void publishRowByRow() {
-        List<OutboxEvent> events = outboxEventRepository.findPendingBatch(BATCH_SIZE);
+    private void publishRowByRow(OutboxHandler handler) {
+        List<OutboxEvent> events = outboxEventRepository.findPendingBatch(handler.eventType(), BATCH_SIZE);
 
         log.debug("publishRowByRow events size: {}", events.size());
 
         for (OutboxEvent event : events) {
             try {
-                PlaceOrderMQMessage message = JSON.parseObject(event.getPayload(), PlaceOrderMQMessage.class);
-                kafkaOrderProducer.sendAndAwaitAck(message);
+                handler.publish(event);
                 outboxEventRepository.markPublished(event.getId(), LocalDateTime.now(ZoneId.systemDefault()));
 
                 log.debug("OutboxPublisher [row-by-row]: published eventId={}, token={}",
@@ -76,8 +90,8 @@ public class OutboxPublisherJob {
      * - Failure window
      * - Difficult debug
      */
-    private void publishBatch() {
-        List<OutboxEvent> events = outboxEventRepository.findPendingBatch(BATCH_SIZE);
+    private void publishBatch(OutboxHandler handler) {
+        List<OutboxEvent> events = outboxEventRepository.findPendingBatch(handler.eventType(), BATCH_SIZE);
 
         if (events.isEmpty()) return;
 
@@ -118,5 +132,4 @@ public class OutboxPublisherJob {
             log.debug("OutboxPublisher [batch]: marked {} events as PUBLISHED", successIds.size());
         }
     }
-
 }

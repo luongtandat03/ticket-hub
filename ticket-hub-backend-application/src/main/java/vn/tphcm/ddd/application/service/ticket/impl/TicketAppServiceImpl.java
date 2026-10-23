@@ -13,7 +13,7 @@ package vn.tphcm.ddd.application.service.ticket.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import vn.tphcm.ddd.application.dto.TicketResponse;
+import vn.tphcm.ddd.application.dto.response.TicketResponse;
 import vn.tphcm.ddd.application.mapper.TicketMapper;
 import vn.tphcm.ddd.application.service.ticket.TicketAppService;
 import vn.tphcm.ddd.application.service.ticket.cache.TicketAppCacheService;
@@ -38,7 +38,7 @@ public class TicketAppServiceImpl implements TicketAppService {
     }
 
     @Override
-    public List<TicketResponse> getTicketsByStatus(Integer status, String version) {
+    public List<TicketResponse> getTicketsByStatus(Integer status, Long version) {
         return ticketAppCacheService.getTicketsByStatus(status, version);
     }
 }

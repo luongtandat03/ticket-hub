@@ -12,8 +12,8 @@ package vn.tphcm.ddd.application.service.order;
  */
 
 import vn.tphcm.ddd.application.dto.PageResponse;
-import vn.tphcm.ddd.application.dto.PlaceOrderResponse;
-import vn.tphcm.ddd.application.dto.TicketOrderResponse;
+import vn.tphcm.ddd.application.dto.response.PlaceOrderResponse;
+import vn.tphcm.ddd.application.dto.response.TicketOrderResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,9 +27,15 @@ public interface TicketOrderAppService {
 
     List<TicketOrderResponse> findByDateRange(String nTable, LocalDateTime startDate, LocalDateTime endDate);
 
-    boolean cancelOrder(String userId, String orderNumber);
+    boolean cancelOrder(String orderNumber);
+
+    boolean cancelOrderAfterPayment(String orderNumber);
 
     PageResponse<TicketOrderResponse> findPage(String yearMonth, String lastId, int limit);
 
     PlaceOrderResponse placeOrderCAS(String ticketId, int quantity);
+
+    boolean cancelExpiredOrder(String orderNumber);
+
+    boolean markOrderPaid(String orderNumber);
 }

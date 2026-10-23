@@ -15,11 +15,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.Map;
+
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class EmailMQMessage {
-    private String template;
+    private String token;
+    private String messageId;
+    private String eventType;
     private String recipient;
+    private String content;
+    private Map<String, Object> data;
+    private long timestamp;
 }

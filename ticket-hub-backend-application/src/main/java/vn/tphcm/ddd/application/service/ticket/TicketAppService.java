@@ -11,12 +11,11 @@ package vn.tphcm.ddd.application.service.ticket;
  * @date: 9/15/2026
  */
 
-import lombok.RequiredArgsConstructor;
-import vn.tphcm.ddd.application.dto.TicketResponse;
+import vn.tphcm.ddd.application.dto.response.TicketResponse;
 
 import java.util.List;
 
 public interface TicketAppService {
     TicketResponse getTicketById(String ticketId);
-    List<TicketResponse> getTicketsByStatus(Integer status, String version);
+    List<TicketResponse> getTicketsByStatus(Integer status, Long version);
 }

@@ -51,15 +51,19 @@ public class OrderCancelSchedule {
     public void scheduleTimeout(String orderNumber, String yearMonth, String ticketId, int quantity) {
         TimeoutPayload timeoutPayload = new TimeoutPayload(orderNumber, yearMonth, ticketId, quantity);
         long expiredAt = System.currentTimeMillis() + PAYMENT_TIMEOUT_MINUTES * 60000L;
-        redisInfrastructureService.zAdd(ZSET_KEY, timeoutPayload, expiredAt);
-        log.info("[CANCEL-SCHEDULE] ZADD order:cancel orderNumber={}, expiredAt={}", orderNumber, expiredAt);
+        scheduleAt(timeoutPayload, expiredAt);
+    }
+
+    public void scheduleAt(TimeoutPayload timeoutPayload, long expiredAt) {
+        redisInfrastructureService.zAdd(ZSET_KEY, JSON.toJSONString(timeoutPayload), expiredAt);
+        log.info("[CANCEL-SCHEDULE] ZADD order:cancel orderNumber={}, expiredAt={}", timeoutPayload.getOrderNumber(), expiredAt);
     }
 
     public TimeoutPayload parse(String rawMember) {
         return JSON.parseObject(rawMember, TimeoutPayload.class);
     }
 
-    public void remove(String rawMember) {
-        redisInfrastructureService.zRemove(ZSET_KEY, rawMember);
+    public boolean remove(String rawMember) {
+        return redisInfrastructureService.zRemove(ZSET_KEY, rawMember);
     }
 }

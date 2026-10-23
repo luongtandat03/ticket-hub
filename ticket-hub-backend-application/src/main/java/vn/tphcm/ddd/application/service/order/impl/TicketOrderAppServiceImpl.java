@@ -15,16 +15,21 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.PessimisticLockException;
 import org.jspecify.annotations.NonNull;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import vn.tphcm.ddd.application.dto.PageResponse;
-import vn.tphcm.ddd.application.dto.PlaceOrderResponse;
-import vn.tphcm.ddd.application.dto.TicketOrderResponse;
+import vn.tphcm.ddd.application.dto.response.PlaceOrderResponse;
+import vn.tphcm.ddd.application.dto.response.TicketOrderResponse;
 import vn.tphcm.ddd.application.schedule.OrderCancelSchedule;
 import vn.tphcm.ddd.application.service.order.TicketOrderAppService;
 import vn.tphcm.ddd.application.service.order.cache.StockOrderCacheService;
+import vn.tphcm.ddd.domain.model.PaymentTransaction;
 import vn.tphcm.ddd.domain.model.TicketOrder;
+import vn.tphcm.ddd.domain.model.User;
 import vn.tphcm.ddd.domain.service.OrderDeductionDomainService;
+import vn.tphcm.ddd.domain.service.PaymentTransactionDomainService;
 import vn.tphcm.ddd.domain.service.TicketOrderDomainService;
 import vn.tphcm.ddd.infrastructure.distributed.redisson.RedisDistributedLocker;
 import vn.tphcm.ddd.infrastructure.distributed.redisson.RedisDistributedService;
@@ -37,7 +42,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -48,15 +52,18 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
     private final TicketOrderDomainService ticketOrderDomainService;
     private final OrderDeductionDomainService orderDeductionDomainService;
     private final OrderCancelSchedule orderCancelScheduleService;
+    private final PaymentTransactionDomainService paymentTransactionDomainService;
+    private final TransactionTemplate transactionTemplate;
+    private final RedisDistributedService redisDistributedService;
 
     private static final String TERMINAL = "OKS-SGN";
-    private final RedisDistributedService redisDistributedService;
 
     private static final String FAILED_STOCK_TICKET = "TICKET_NOT_FOUND";
     private static final String OUT_STOCK_TICKET = "OUT_OF_STOCK";
     private static final String STOCK_CONFLICT = "STOCK_CONFLICT";
     private static final String PRICE_NOT_FOUND = "PRICE_NOT_FOUND";
     private static final String ERROR = "SERVER_ERROR";
+    private static final long PAYMENT_GATEWAY_TIMEOUT_MINUTES = 15;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -155,11 +162,13 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
 
     @Override
     @Transactional
-    public boolean cancelOrder(String userId, String orderNumber) {
-        log.info("Cancel order with userId: {}, orderNumber: {}", userId, orderNumber);
+    public boolean cancelOrder(String orderNumber) {
+        log.info("Cancel order with orderNumber: {}", orderNumber);
 
         String keyLock = genEventCancelKeyLock(orderNumber);
         RedisDistributedLocker locker = redisDistributedService.getRedisDistributedLock(keyLock);
+
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         try {
             boolean isLocker = locker.tryLock(1, 5, TimeUnit.SECONDS);
@@ -171,13 +180,66 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
 
             TicketOrderResponse response = findByOrderNumber(orderNumber);
 
-            return handleTicketOrder(response, userId);
+            return handleTicketOrder(response, user.getId());
 
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalArgumentException("Order was interrupted, please try again later " + e.getMessage());
         } finally {
             locker.unlock();
         }
+    }
+
+    @Override
+    public boolean cancelOrderAfterPayment(String orderNumber) {
+        log.info("Cancel order after payment with orderNumber: {}", orderNumber);
+
+        String keyLock = "LOCK:CANCEL:" + orderNumber;
+        RedisDistributedLocker locker = redisDistributedService.getRedisDistributedLock(keyLock);
+
+        try {
+            boolean isLocker = locker.tryLock(1, 5, TimeUnit.SECONDS);
+
+            if (!isLocker) {
+                log.warn("System is processing this order , please wait... {}", orderNumber);
+                return false;
+            }
+
+            TicketOrderResponse response = findByOrderNumber(orderNumber);
+
+            if (response == null) {
+                return false;
+            }
+
+            return handleCancelOrderWithoutUserId(response);
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalArgumentException("Order was interrupted, please try again later " + e.getMessage());
+        } finally {
+            locker.unlock();
+        }
+    }
+
+    private boolean handleCancelOrderWithoutUserId(TicketOrderResponse response) {
+        if (response.getOrderStatus() == 2) {
+            log.info("Order has been cancelled");
+            return true;
+        }
+
+        String yearMonth = extractYearMonthFromOrderNumber(response.getOrderNumber());
+        boolean isUpdated = orderDeductionDomainService.compareAndSetOrderStatus(yearMonth, response.getOrderNumber(), 0, 2);
+
+        if (!isUpdated) {
+            log.error("Failed to update order status: {}", response.getOrderNumber());
+            return false;
+        }
+
+        restoreStockTicketOrder(response.getTicketId(), response.getQuantity());
+
+        log.info("Cancel Order Successfully: {}", response.getOrderNumber());
+
+        return true;
     }
 
     @Override
@@ -188,41 +250,45 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
 
         boolean hasMore = results.size() == limit;
 
-        Long nextCursor = hasMore ? ((Number) results.getLast()[0]).longValue() : null;
+        String nextCursor = hasMore ? String.valueOf(results.getLast()[0]) : null;
 
         return new PageResponse<>(items, nextCursor, hasMore);
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+//    @Transactional(rollbackFor = Exception.class)
     public PlaceOrderResponse placeOrderCAS(String ticketId, int quantity) {
-        boolean isRedisDecremented = false;
+//        boolean isRedisDecremented = false;
+
+        int redisResult = stockOrderCacheService.decreaseStockCache(ticketId, quantity);
+
+        if (redisResult == -1) {
+            log.info("placeOrderCAS: cache miss for ticketId = {}, warning up ...", ticketId);
+            boolean warned = stockOrderCacheService.addStockAvailableToCache(ticketId);
+            if (!warned) {
+                return PlaceOrderResponse.fail(FAILED_STOCK_TICKET, "Not found event");
+            }
+            redisResult = stockOrderCacheService.decreaseStockCache(ticketId, quantity);
+        }
+
+        if (redisResult == 0) {
+            log.info("placeOrderCAS: cache miss for ticketId = {}", ticketId);
+            return PlaceOrderResponse.fail(OUT_STOCK_TICKET, "Out stock, please try again later");
+        }
+
+
+        String orderNumber;
+        String nTable;
 
         try {
-            int redisResult = stockOrderCacheService.decreaseStockCacheByLua(ticketId, quantity);
+//            isRedisDecremented = true;
 
-            if (redisResult == -1) {
-                log.info("placeOrderCAS: cache miss for ticketId = {}, warning up ...", ticketId);
-                boolean warned = stockOrderCacheService.addStockAvailableToCache(ticketId);
-                if (!warned) {
-                    return PlaceOrderResponse.fail(FAILED_STOCK_TICKET, "Not found event");
-                }
-                redisResult = stockOrderCacheService.decreaseStockCacheByLua(ticketId, quantity);
-            }
-
-            if (redisResult == 0) {
-                log.info("placeOrderCAS: cache miss for ticketId = {}", ticketId);
-                return PlaceOrderResponse.fail(OUT_STOCK_TICKET, "Out stock, please try again later");
-            }
-
-            isRedisDecremented = true;
-
-            boolean isDecreaseStockSuccess = ticketOrderDomainService.decreaseStock(ticketId, quantity);
-            if (!isDecreaseStockSuccess) {
-                stockOrderCacheService.increaseStockCacheByLUA(ticketId, quantity);
-                log.warn("placeOrderCAS: price not found for ticketId = {}, rollback redis", ticketId);
-                return PlaceOrderResponse.fail(STOCK_CONFLICT, "Booking unsuccessful, please try again later");
-            }
+//            boolean isDecreaseStockSuccess = ticketOrderDomainService.decreaseStock(ticketId, quantity);
+//            if (!isDecreaseStockSuccess) {
+//                stockOrderCacheService.increaseStockCacheByLUA(ticketId, quantity);
+//                log.warn("placeOrderCAS: price not found for ticketId = {}, rollback redis", ticketId);
+//                return PlaceOrderResponse.fail(STOCK_CONFLICT, "Booking unsuccessful, please try again later");
+//            }
 
             long unitPrice = stockOrderCacheService.getEffectivePrice(ticketId);
 
@@ -232,34 +298,123 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
                 return PlaceOrderResponse.fail(PRICE_NOT_FOUND, "Do not confirm price");
             }
 
-            String userId = UUID.randomUUID().toString();
-            String orderNumber = genOrderNumber(userId);
-            String nTable = extractYearMonthFromOrderNumber(orderNumber);
+            User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+            orderNumber = genOrderNumber(user.getId());
+            nTable = extractYearMonthFromOrderNumber(orderNumber);
 
             TicketOrder order = TicketOrder.builder()
                     .ticketId(ticketId)
                     .quantity(quantity)
                     .orderStatus(0)
-                    .userId(userId)
+                    .userId(user.getId())
                     .orderNumber(orderNumber)
                     .totalAmount(new BigDecimal(unitPrice * quantity))
                     .terminalId(TERMINAL)
                     .orderNotes("Order -> Pending")
                     .build();
 
-            orderDeductionDomainService.insertOrder(nTable, order);
+            boolean placed = Boolean.TRUE.equals(transactionTemplate.execute(status -> {
 
-            log.info("placeOrderCAS: success | ticketId={} orderNumber={}", ticketId, orderNumber);
+                orderDeductionDomainService.insertOrder(nTable, order);
 
-            orderCancelScheduleService.scheduleTimeout(orderNumber, nTable, ticketId, quantity);
+                log.info("placeOrderCAS: success | ticketId={} orderNumber={}", ticketId, orderNumber);
 
-            return PlaceOrderResponse.success(orderNumber);
+                if (!ticketOrderDomainService.decreaseStock(ticketId, quantity)) {
+                    status.setRollbackOnly();
+                    return false;
+                }
+
+                return true;
+            }));
+
+            if (!placed) {
+                stockOrderCacheService.increaseStockCacheByLUA(ticketId, quantity);
+                return PlaceOrderResponse.fail(STOCK_CONFLICT, "Booking unsuccessful, please try again later");
+            }
         } catch (Exception e) {
             log.error("placeOrderCAS: error for ticketId={}", ticketId, e);
-            if (isRedisDecremented) stockOrderCacheService.increaseStockCacheByLUA(ticketId, quantity);
+            stockOrderCacheService.increaseStockCacheByLUA(ticketId, quantity);
 
             return PlaceOrderResponse.fail(ERROR, "Server error, please try again later");
         }
+
+        try {
+            orderCancelScheduleService.scheduleTimeout(orderNumber, nTable, ticketId, quantity);
+        } catch (Exception e) {
+            log.error("placeOrderCAS: scheduleTimeout failed, safety-net job will cancel {}", orderNumber, e);
+        }
+
+        log.info("placeOrderCAS: success | ticketId={} orderNumber={}", ticketId, orderNumber);
+        return PlaceOrderResponse.success(orderNumber);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean cancelExpiredOrder(String orderNumber) {
+        RedisDistributedLocker locker = redisDistributedService.getRedisDistributedLock("LOCK:PAYMENT:" + orderNumber);
+
+        try {
+            boolean isLock = locker.tryLock(1, 5, TimeUnit.SECONDS);
+
+            if (!isLock) {
+                return false;
+            }
+
+            TicketOrderResponse response = findByOrderNumber(orderNumber);
+
+            if (response == null || response.getOrderStatus() != 0) {
+                log.info("[ORDER-TIMEOUT] order {} is not pending anymore, skip!", orderNumber);
+                return false;
+            }
+
+            PaymentTransaction paymentTransaction = paymentTransactionDomainService.findByOrderNumber(orderNumber);
+
+            if (paymentTransaction != null && Integer.valueOf(1).equals(paymentTransaction.getPaymentStatus())) {
+                orderCancelScheduleService.scheduleAt(new OrderCancelSchedule.TimeoutPayload(
+                                orderNumber,
+                                extractYearMonthFromOrderNumber(orderNumber),
+                                response.getTicketId(),
+                                response.getQuantity()),
+                        System.currentTimeMillis() + 5 * 60_000L
+                );
+                log.info("[ORDER-TIMEOUT] order {} has an unresolved payment, postpone cancel", orderNumber);
+                return false;
+            }
+
+//            if (isPaymentStillOpen(paymentTransaction)) {
+//                long retryAt = paymentTransaction.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+//                        + (PAYMENT_GATEWAY_TIMEOUT_MINUTES + 1) * 60000L;
+//
+//                orderCancelScheduleService.scheduleAt(
+//                        new OrderCancelSchedule.TimeoutPayload(orderNumber,
+//                                extractYearMonthFromOrderNumber(orderNumber),
+//                                response.getTicketId(),
+//                                response.getQuantity()), retryAt
+//                );
+//
+//                log.info("[ORDER-TIMEOUT] order {} has an open payment, postpone cancel", orderNumber);
+//
+//                return false;
+//            }
+
+            boolean isCancelled = handleCancelOrderWithoutUserId(response);
+
+            log.info("[ORDER-TIMEOUT] order {} cancelled={}", orderNumber, isCancelled);
+
+            return isCancelled;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("[ORDER-TIMEOUT] order {} has been interrupted", orderNumber, e);
+            return false;
+        } finally {
+            locker.unlock();
+        }
+    }
+
+    @Override
+    public boolean markOrderPaid(String orderNumber) {
+        return orderDeductionDomainService.compareAndSetOrderStatus(extractYearMonthFromOrderNumber(orderNumber), orderNumber, 0, 1);
     }
 
 
@@ -308,24 +463,12 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
             return false;
         }
 
-        if (ticketOrderResponse.getOrderStatus() == 2) {
-            log.info("Order has been cancelled");
-            return true;
-        }
-
-        String yearMonth = extractYearMonthFromOrderNumber(ticketOrderResponse.getOrderNumber());
-        boolean isUpdated = orderDeductionDomainService.updateOrderStatus(yearMonth, ticketOrderResponse.getOrderNumber(), 2);
-
-        if (!isUpdated) {
-            log.error("Failed to update order status: {}", ticketOrderResponse.getOrderNumber());
+        if (isPaymentStillOpen(paymentTransactionDomainService.findByOrderNumber(ticketOrderResponse.getOrderNumber()))) {
+            log.info("Order {} has an open payment, cannot cancel", ticketOrderResponse.getOrderNumber());
             return false;
         }
 
-        restoreStockTicketOrder(ticketOrderResponse.getTicketId(), ticketOrderResponse.getQuantity());
-
-        log.info("Cancel Order Successfully: {}", ticketOrderResponse.getOrderNumber());
-
-        return true;
+        return handleCancelOrderWithoutUserId(ticketOrderResponse);
     }
 
     private void restoreStockTicketOrder(String ticketId, int quantity) {
@@ -352,7 +495,16 @@ public class TicketOrderAppServiceImpl implements TicketOrderAppService {
     }
 
     private String genEventCancelKeyLock(String orderNumber) {
-        return "LOCK:CANCEL:" + orderNumber;
+        return "LOCK:PAYMENT:" + orderNumber;
+    }
+
+    private boolean isPaymentStillOpen(PaymentTransaction transaction) {
+        return transaction != null
+                && transaction.getPaymentStatus() == 1
+                && transaction.getCreatedAt() != null
+                && transaction.getCreatedAt().isAfter(
+                LocalDateTime.now(ZoneId.systemDefault()).minusMinutes(PAYMENT_GATEWAY_TIMEOUT_MINUTES)
+        );
     }
 
 

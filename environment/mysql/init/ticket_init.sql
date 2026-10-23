@@ -103,7 +103,8 @@ CREATE TABLE IF NOT EXISTS `tickethub`.`tbl_outbox_event`
     status       TINYINT     NOT NULL DEFAULT 0 COMMENT '0=PENDING, 1=PUBLISHED',
     created_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     published_at DATETIME    NULL COMMENT 'Thời điểm Kafka Broker ACK thành công',
-    INDEX `idx_status_created` (status, created_at)
+    INDEX `idx_status_created` (status, created_at),
+    INDEX `idx_status_type_created` (status, event_type, created_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci COMMENT = 'Outbox event table — đảm bảo atomicity giữa DB write và Kafka publish';
@@ -123,9 +124,9 @@ CREATE TABLE IF NOT EXISTS `tickethub`.`tbl_idempotency_key`
 CREATE TABLE IF NOT EXISTS `tickethub`.`tbl_user`
 (
     id           VARCHAR(36)  NOT NULL PRIMARY KEY,
-    username     VARCHAR(255) NOT NULL,
-    email        VARCHAR(255) NOT NULL,
-    phone_number VARCHAR(10)  NOT NULL,
+    username     VARCHAR(255) NOT NULL UNIQUE,
+    email        VARCHAR(255) NOT NULL UNIQUE,
+    phone_number VARCHAR(10)  NOT NULL UNIQUE,
     password     VARCHAR(255) NOT NULL,
     status       TINYINT      NOT NULL DEFAULT 0 COMMENT '0=PENDING, 1=ACTIVE, 2=DELETED',
     created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -133,5 +134,84 @@ CREATE TABLE IF NOT EXISTS `tickethub`.`tbl_user`
     INDEX idx_id (id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci COMMENT = 'Table for user'
+  COLLATE = utf8mb4_unicode_ci COMMENT = 'Table for user';
 
+# INSERT INTO `tickethub`.`tbl_user`(id, username, email, phone_number, password, created_at, updated_at)
+# VALUES (``);
+
+-- 7. role table
+CREATE TABLE IF NOT EXISTS `tickethub`.`tbl_role`
+(
+    `id`         VARCHAR(36)  NOT NULL PRIMARY KEY,
+    `name`       VARCHAR(30)  NOT NULL COMMENT 'Tên vai trò',
+    `key`        VARCHAR(100) NOT NULL COMMENT 'Chuỗi định danh vai trò',
+    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT = 'Table for role';
+
+INSERT INTO `tickethub`.tbl_role (id, name, `key`, created_at, updated_at)
+VALUES ('01a105ff-97f5-77e8-9df7-8e0ff3338c04', 'admin', 'ADMIN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+       ('01a105ff-b296-7120-9674-a36228395518', 'member', 'MEMBER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+       ('01a109f8-430b-74da-a56e-c68df7676a9e', 'guest', 'GUEST', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+-- 8. permission table
+CREATE TABLE IF NOT EXISTS `tickethub`.`tbl_permission`
+(
+    id              VARCHAR(36)  NOT NULL PRIMARY KEY,
+    permission_name VARCHAR(30)  NOT NULL COMMENT 'Tên quyền',
+    permission_key  VARCHAR(100) NOT NULL COMMENT 'Chuỗi định danh quyền',
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT = 'Table for permission';
+
+-- 9. user_role table
+CREATE TABLE IF NOT EXISTS `tickethub`.`tbl_user_has_role`
+(
+    `user_id` VARCHAR(36) NOT NULL COMMENT 'ID người dùng',
+    `role_id` VARCHAR(36) NOT NULL COMMENT 'ID vai trò',
+    PRIMARY KEY (user_id, role_id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT = 'Bảng liên kết user với role';
+
+-- 10. role_permission table
+CREATE TABLE IF NOT EXISTS `tickethub`.`tbl_role_has_permission`
+(
+    `role_id`       VARCHAR(36) NOT NULL COMMENT 'ID vai trò',
+    `permission_id` VARCHAR(36) NOT NULL COMMENT 'ID quyền',
+    PRIMARY KEY (role_id, permission_id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT = 'Bảng liên kết role với permission';
+
+-- 11. payment transaction table
+CREATE TABLE IF NOT EXISTS `tickethub`.`tbl_payment_transaction`
+(
+    `id`                     VARCHAR(36)    NOT NULL,
+    `payment_id`             VARCHAR(64)    NOT NULL COMMENT 'Mã thanh toán duy nhất (UUID)',
+    `order_number`           VARCHAR(64)    NOT NULL COMMENT 'Liên kết với bảng Order',
+    `user_id`                VARCHAR(36)    NOT NULL,
+
+    `amount`                 DECIMAL(16, 3) NOT NULL COMMENT 'Số tiền thanh toán',
+    `payment_method`         VARCHAR(20)    NOT NULL COMMENT 'VNPAY, MOMO, LINKED_BANK...',
+    `payment_status`         TINYINT        NOT NULL DEFAULT 0 COMMENT '0:INIT, 1:IN_PROGRESS, 2:SUCCESS, 3:FAILED',
+
+    `gateway_transaction_id` VARCHAR(100)   NULL COMMENT 'Mã từ phía Ngân hàng trả về',
+    `payment_url`            TEXT           NULL COMMENT 'Link thanh toán trả về cho User',
+    `create_date`           VARCHAR(16)    NOT NULL COMMENT 'Thời gian tạo link url được vnpay gửi',
+
+    `updated_at`             DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `created_at`             DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_payment_id` (`payment_id`),
+    KEY `idx_order_number` (`order_number`),
+    KEY `idx_user_id` (`user_id`),
+    INDEX idx_status_created (payment_status, created_at)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci COMMENT ='Bảng ghi nhận lịch sử thanh toán';
