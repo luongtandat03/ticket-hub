@@ -33,7 +33,7 @@ pipeline {
         }
         stage('Docker Image') {
             steps {
-                sh 'docker build -t $IMAGE:$BUILD_NUMBER -t $IMAGE:latest ticket-hub-start'
+                sh 'docker build -t $IMAGE:$BUILD_NUMBER -t $IMAGE:latest ticket-hub-backend-start'
             }
         }
         stage('Push') {
