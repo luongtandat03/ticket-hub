@@ -97,3 +97,17 @@ services:
       retries: 10
     networks:
       - pre-event-network
+
+  jenkins:
+    build: ./jenkins
+    image: ticket-hub/jenkins:2.587
+    container_name: pre-event-jenkins
+    user: root
+    volumes:
+      - ./data/jenkins:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "7090:8080"
+      - "50000:50000"
+    networks:
+      - pre-event-network
