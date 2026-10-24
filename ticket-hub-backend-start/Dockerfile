@@ -1,4 +1,4 @@
-FROM eclipse-temurim:25-jre
+FROM eclipse-temurin:25-jre
 RUN useradd --system --no-create-home app
 WORKDIR /app
 COPY target/*.jar app.jar
