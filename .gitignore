@@ -40,6 +40,7 @@ uml/
 
 ### File env ###
 .env
+.env-jenkins
 
 ### Folder benchmark ###
 benchmark/
