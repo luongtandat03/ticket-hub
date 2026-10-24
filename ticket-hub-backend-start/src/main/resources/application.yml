@@ -54,8 +54,8 @@ spring:
       indent-output: true
   data:
     redis:
-      host: localhost
-      port: 6319
+      host: ${SPRING_DATA_REDIS_HOST}
+      port: ${SPRING_DATA_REDIS_PORT}
       password: ""
       lettuce:
         pool:
