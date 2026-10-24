@@ -65,7 +65,8 @@ pipeline {
                           -p 1122:1122 \
                           $IMAGE:$BUILD_NUMBER
                         for i in $(seq 1 60); do
-                          docker logs ticket-hub-backend 2>&1 | grep -q 'Started StartApplication' && { echo 'Backend is up'; exit 0; }
+                          code=$(curl -s -o /dev/null -w '%{http_code}' http://ticket-hub-backend:1122/actuator/health || true)
+                          [ "$code" != 000 ] && { echo "Backend is up (HTTP $code)"; exit 0; }
                           [ "$(docker inspect -f '{{.State.Running}}' ticket-hub-backend)" = true ] || break
                           sleep 2
                         done

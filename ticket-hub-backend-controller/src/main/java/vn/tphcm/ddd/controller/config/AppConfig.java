@@ -45,7 +45,8 @@ public class AppConfig implements WebMvcConfigurer {
     private final String[] whiteListUrls = {
             "/identity/auth/**",
             "/payment/callback/**",
-            "/ticket/**"
+            "/ticket/**",
+            "/actuator/health"
     };
 
     private final AuthenticationFilter authenticationFilter;
