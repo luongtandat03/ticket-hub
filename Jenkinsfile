@@ -11,6 +11,8 @@ pipeline {
         pollSCM('H/5 * * * *')
     }
 
+    environment { IMAGE = 'ticket-hub-backend' }
+
     stages {
         stage('Build & Test') {
             agent {
