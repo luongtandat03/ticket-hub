@@ -3,7 +3,7 @@ server:
   tomcat:
     accept-count: 2000
     max-connections: 10000
-#  forward-headers-strategy: native
+  forward-headers-strategy: native
 
 spring:
   application:
@@ -11,7 +11,6 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: 100
-      minimum-idle: 100
       connection-timeout: 3000
       validation-timeout: 1000
       idle-timeout: 600000

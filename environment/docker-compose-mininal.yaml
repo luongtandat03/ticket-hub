@@ -70,6 +70,7 @@ services:
     networks:
       - pre-event-network
 
+  # Kafka
   kafka:
     image: apache/kafka:4.3.1
     container_name: pre-event-kafka
@@ -98,6 +99,7 @@ services:
     networks:
       - pre-event-network
 
+  # Jenkins
   jenkins:
     build: ./jenkins
     image: ticket-hub/jenkins:2.587
@@ -109,5 +111,16 @@ services:
     ports:
       - "7090:8080"
       - "50000:50000"
+    networks:
+      - pre-event-network
+
+  # Nginx
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: pre-event-nginx
+    ports:
+      - "1122:80"
+    volumes:
+      - ./nginx/conf/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - pre-event-network

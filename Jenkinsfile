@@ -55,23 +55,35 @@ pipeline {
             steps {
                 withCredentials([file(credentialsId: 'ticket-hub-env', variable: 'ENV_FILE')]) {
                     sh '''
-                        docker rm -f ticket-hub-backend || true
-                        docker run -d --name ticket-hub-backend \
-                          --network environment_pre-event-network \
-                          --env-file "$ENV_FILE" \
-                          -e BACKEND_IP=1122 \
-                          -e SPRING_DATA_REDIS_HOST=pre-event-redis -e SPRING_DATA_REDIS_PORT=6379 \
-                          -e SPRING_KAFKA_BOOTSTRAP_SERVERS=pre-event-kafka:9092 \
-                          -p 1122:1122 \
-                          $IMAGE:$BUILD_NUMBER
-                        for i in $(seq 1 60); do
-                          code=$(curl -s -o /dev/null -w '%{http_code}' http://ticket-hub-backend:1122/actuator/health || true)
-                          [ "$code" != 000 ] && { echo "Backend is up (HTTP $code)"; exit 0; }
-                          [ "$(docker inspect -f '{{.State.Running}}' ticket-hub-backend)" = true ] || break
+                        docker start pre-event-mysql pre-event-redis pre-event-kafka
+                        for i in $(seq 1 30); do
+                          docker exec pre-event-mysql mysqladmin ping --silent >/dev/null 2>&1 && break
                           sleep 2
                         done
-                        docker logs --tail 100 ticket-hub-backend
-                        exit 1
+
+                        docker rm -f ticket-hub-backend || true
+                        for n in 1 2; do
+                          docker rm -f ticket-hub-backend-$n || true
+                          docker run -d --name ticket-hub-backend-$n \
+                            --network environment_pre-event-network \
+                            --env-file "$ENV_FILE" \
+                            -e BACKEND_IP=1122 \
+                            -e SPRING_DATA_REDIS_HOST=pre-event-redis -e SPRING_DATA_REDIS_PORT=6379 \
+                            -e SPRING_KAFKA_BOOTSTRAP_SERVERS=pre-event-kafka:9092 \
+                            -e SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=50 -e SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=10 \
+                            -e SERVER_FORWARD_HEADERS_STRATEGY=native \
+                            $IMAGE:$BUILD_NUMBER
+                          up=false
+                          for i in $(seq 1 60); do
+                            code=$(curl -s -o /dev/null -w '%{http_code}' http://ticket-hub-backend-$n:1122/actuator/health || true)
+                            [ "$code" != 000 ] && { up=true; break; }
+                            [ "$(docker inspect -f '{{.State.Running}}' ticket-hub-backend-$n)" = true ] || break
+                            sleep 2
+                          done
+                          [ "$up" = true ] || { docker logs --tail 100 ticket-hub-backend-$n; exit 1; }
+                          echo "ticket-hub-backend-$n is up"
+                          if docker ps --format '{{.Names}}' | grep -qx pre-event-nginx; then docker exec pre-event-nginx nginx -s reload; fi
+                        done
                     '''
                 }
             }
