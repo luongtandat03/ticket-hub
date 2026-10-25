@@ -11,7 +11,7 @@ scrape_configs:
   - job_name: "ticket-hub-springboot"
     scrape_interval: 5s
     static_configs:
-      - targets: [ "host.docker.internal:1122" ]
+      - targets: [ "ticket-hub-backend-1:1122", "ticket-hub-backend-2:1122" ]
     metrics_path: "/actuator/prometheus"
 
   - job_name: "ticket-hub-node-exporter"

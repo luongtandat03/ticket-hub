@@ -46,7 +46,8 @@ public class AppConfig implements WebMvcConfigurer {
             "/identity/auth/**",
             "/payment/callback/**",
             "/ticket/**",
-            "/actuator/health"
+            "/actuator/health",
+            "/actuator/prometheus"
     };
 
     private final AuthenticationFilter authenticationFilter;
